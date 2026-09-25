@@ -29,6 +29,7 @@ body.touch #hud{left:calc(16px + env(safe-area-inset-left));top:12px;bottom:auto
 body.touch #speed{font-size:42px}
 body.touch #map{width:110px;height:110px;right:calc(12px + env(safe-area-inset-right));top:12px}
 body.touch #credits{top:auto;bottom:3px;font-size:8px;white-space:nowrap}
+@media (orientation:portrait){body.touch #credits{white-space:normal;width:92%;text-align:center}}
 body.touch #intro{padding:24px}
 body.touch #intro h1{font-size:40px}
 body.touch #hint{bottom:auto;top:14px}
@@ -56,7 +57,7 @@ body.touch #hint{bottom:auto;top:14px}
 <div id="intro">
   <h1>宜蘭<span>Yilan, Taiwan</span></h1>
   <p>Lanyang Plain · golden hour · Porsche 911 · BUH-9111</p>
-  <div class="start">Click to begin</div>
+  <div class="start">Loading…</div>
 </div>
 <div id="help">
   <div><b>WASD</b>walk / drive</div>
@@ -79,6 +80,12 @@ body.touch #hint{bottom:auto;top:14px}
 <div id="place"><div>蘭陽平原</div><div>Lanyang Plain, Yilan County</div></div>
 <div id="credits">Porsche 911 Carrera 4S model: <a href="https://sketchfab.com/3d-models/free-porsche-911-carrera-4s-d01b254483794de3819786d93e0e1ebf" target="_blank">Lionsharp Studios</a>, CC BY-SA 4.0 · Avatars: <a href="https://github.com/microsoft/Microsoft-Rocketbox" target="_blank">Microsoft Rocketbox</a>, MIT</div>
 
+<script>
+  function showStartError(msg) { const s = document.querySelector('#intro .start'); if (s) { s.style.animation = 'none'; s.style.textTransform = 'none'; s.style.letterSpacing = '0'; s.textContent = 'Could not start: ' + msg; } }
+  addEventListener('error', e => showStartError(e.message || 'a file failed to load'));
+  addEventListener('unhandledrejection', e => showStartError((e.reason && e.reason.message) || String(e.reason)));
+</script>
+<script async src="https://ga.jspm.io/npm:es-module-shims@1.10.0/dist/es-module-shims.js"></script>
 <script type="importmap">
 {"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
 </script>
@@ -93,6 +100,16 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 const V3 = THREE.Vector3;
+
+// ---------- intro tap: accept it immediately, start once everything has loaded ----------
+const introEl = document.getElementById('intro'), startEl = introEl.querySelector('.start');
+let startGame = null, startRequested = false;
+function requestStart() {
+  if (startGame) startGame();
+  else if (!startRequested) { startRequested = true; startEl.dataset.queued = '1'; }
+}
+introEl.addEventListener('click', requestStart);
+introEl.addEventListener('touchend', e => { e.preventDefault(); requestStart(); });
 
 // ---------- random + noise ----------
 let seed = 911;
@@ -598,17 +615,20 @@ const loadTex = (url, srgb = true) => new Promise((res, rej) => texLoader.load(u
 const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const fbxLoader = new FBXLoader();
 fbxLoader.manager.setURLModifier(url => /\.tga$/i.test(url) ? 'data:,' : url);   // textures are supplied separately
-const startEl = document.querySelector('#intro .start');
-startEl.textContent = 'Loading…';
+const loaded = {};
+const EXPECTED_BYTES = 6.2e6;
+const onProgress = url => e => {
+  loaded[url] = e.loaded;
+  const pct = Math.min(99, Math.round(Object.values(loaded).reduce((a, b) => a + b, 0) / EXPECTED_BYTES * 100));
+  startEl.textContent = `Loading… ${pct}%` + (startEl.dataset.queued ? ' · starting when ready' : '');
+};
 const [carGltf, womanFbx, womanHead, girlTex] = await Promise.all([
-  gltfLoader.loadAsync('assets/porsche911.glb'),
-  fbxLoader.loadAsync('assets/woman.fbx'),
-  fbxLoader.loadAsync('assets/woman_head.fbx'),
+  gltfLoader.loadAsync('assets/porsche911.glb', onProgress('car')),
+  fbxLoader.loadAsync('assets/woman.fbx', onProgress('body')),
+  fbxLoader.loadAsync('assets/woman_head.fbx', onProgress('head')),
   Promise.all([loadTex('assets/f_body.jpg'), loadTex('assets/f_body_n.jpg', false), loadTex('assets/f_head.jpg'), loadTex('assets/f_head_n.jpg', false), loadTex('assets/f_hair.png')])
     .then(([body, bodyN, head, headN, hair]) => ({ body, bodyN, head, headN, hair })),
 ]);
-startEl.textContent = isTouch ? 'Tap to begin' : 'Click to begin';
-if (isTouch && innerHeight > innerWidth) introEl.querySelector('p').insertAdjacentHTML('afterend', '<p>Turn your phone sideways for the best view.</p>');
 
 // ---------- the car: Porsche 911 Carrera 4S (991) ----------
 // model space: +z forward, +x = left (driver) side, y up, ground at y = 0
@@ -992,13 +1012,13 @@ function initAudio() {
 }
 
 // ---------- intro ----------
-const introEl = document.getElementById('intro');
 const hintEl = document.getElementById('hint'), hudEl = document.getElementById('hud'), speedEl = document.getElementById('speed'), gearEl = document.getElementById('gear');
 const mapEl = document.getElementById('map'), mapCtx = mapEl.getContext('2d');
 const introCamPos = girl.pos.clone().add(new V3(4.6, 1.15, 1.9)), introLook = girl.pos.clone().add(new V3(-1.6, 0.95, -1.5));
 camera.position.copy(introCamPos); camera.lookAt(introLook);
-introEl.addEventListener('click', () => {
-  introEl.style.opacity = 0; setTimeout(() => introEl.remove(), 800);
+startGame = () => {
+  startGame = () => {};
+  introEl.style.opacity = 0; introEl.style.pointerEvents = 'none'; setTimeout(() => introEl.remove(), 800);
   ['help', 'map', 'place'].forEach(id => document.getElementById(id).style.display = 'block');
   document.body.classList.add('playing');
   try { audio = initAudio(); } catch (e) { console.warn(e); }
@@ -1006,7 +1026,7 @@ introEl.addEventListener('click', () => {
   camYaw = Math.atan2(d.x, d.z); camPitch = 0.12; camDist = 4.5;
   poseTarget = POSES.stand;
   mode = 'walk';
-});
+};
 
 // ---------- update ----------
 let walkPh = 0, moveAmt = 0;
@@ -1213,6 +1233,10 @@ addEventListener('resize', () => {
 });
 window.__game = { car, girl, get mode() { return mode; }, enterCar, exitCar, keys, camera, setCam(y, p, d) { camYaw = y; camPitch = p; camDist = d; lastDrag = clock.elapsedTime + 1e6; } };
 frame();
+startEl.textContent = isTouch ? 'Tap to begin' : 'Click to begin';
+if (isTouch && innerHeight > innerWidth) introEl.querySelector('p').insertAdjacentHTML('afterend', '<p>Turn your phone sideways for the best view.</p>');
+if (startRequested) startGame();
+renderer.domElement.addEventListener('webglcontextlost', () => showStartError('the graphics chip ran out of memory. Close other tabs and reload.'));
 </script>
 </body>
 </html>
