@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>宜蘭 Yilan Drive</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="description" content="Walk around, get into a grey Porsche 911 and drive the rice paddies of Yilan, Taiwan at golden hour.">
 <meta property="og:title" content="宜蘭 Yilan Drive">
 <meta property="og:description" content="Walk around, get into a grey Porsche 911 and drive the rice paddies of Yilan, Taiwan at golden hour.">
@@ -13,7 +13,25 @@
 <meta name="twitter:card" content="summary_large_image">
 <style>
 html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang TC",sans-serif;color:#fff}
-canvas{display:block}
+canvas{display:block;touch-action:none}
+#touch{display:none}
+body.touch{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.touch.playing #touch{display:block}
+#stick{position:fixed;left:calc(24px + env(safe-area-inset-left));bottom:calc(24px + env(safe-area-inset-bottom));width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(255,255,255,.8);pointer-events:none}
+.tbtn{position:fixed;border-radius:50%;background:rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.55);color:#fff;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;touch-action:none;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.tbtn.on{background:rgba(255,255,255,.35)}
+#btnE{right:calc(24px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:84px;height:84px;background:rgba(255,255,255,.9);color:#000;font-size:14px;display:none}
+#btnAct{right:calc(24px + env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom));width:72px;height:72px}
+#btnHorn{right:calc(110px + env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom));width:58px;height:58px}
+body.touch #help,body.touch #place{display:none!important}
+body.touch #hud{left:calc(16px + env(safe-area-inset-left));top:12px;bottom:auto}
+body.touch #speed{font-size:42px}
+body.touch #map{width:110px;height:110px;right:calc(12px + env(safe-area-inset-right));top:12px}
+body.touch #credits{top:auto;bottom:3px;font-size:8px;white-space:nowrap}
+body.touch #intro{padding:24px}
+body.touch #intro h1{font-size:40px}
+body.touch #hint{bottom:auto;top:14px}
 #intro{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:48px;box-sizing:border-box;background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0) 45%);cursor:pointer;transition:opacity .8s}
 #intro h1{margin:0;font-size:56px;font-weight:700;letter-spacing:-1px}
 #intro h1 span{font-weight:300;opacity:.8;margin-left:14px}
@@ -52,6 +70,12 @@ canvas{display:block}
 <div id="hud"><div id="speed">0<small>km/h</small></div><div id="gear">N</div></div>
 <div id="hint"></div>
 <canvas id="map" width="360" height="360"></canvas>
+<div id="touch">
+  <div id="stick"><div id="knob"></div></div>
+  <div class="tbtn" id="btnE">Get in</div>
+  <div class="tbtn" id="btnAct">Run</div>
+  <div class="tbtn" id="btnHorn">Horn</div>
+</div>
 <div id="place"><div>蘭陽平原</div><div>Lanyang Plain, Yilan County</div></div>
 <div id="credits">Porsche 911 Carrera 4S model: <a href="https://sketchfab.com/3d-models/free-porsche-911-carrera-4s-d01b254483794de3819786d93e0e1ebf" target="_blank">Lionsharp Studios</a>, CC BY-SA 4.0 · Avatars: <a href="https://github.com/microsoft/Microsoft-Rocketbox" target="_blank">Microsoft Rocketbox</a>, MIT</div>
 
@@ -92,8 +116,10 @@ const lerpAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (2 * Math.PI) + 2 
 const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
 // ---------- renderer / scene ----------
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (isTouch) document.body.classList.add('touch');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.5;
@@ -125,7 +151,7 @@ scene.add(sky);
 scene.add(new THREE.HemisphereLight(0xcfe2ff, 0x5d6b3c, 0.35));
 const sun = new THREE.DirectionalLight(0xffe4bd, 3.0);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
 Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 400 });
 sun.shadow.bias = -0.0003;
 sun.shadow.normalBias = 0.03;
@@ -581,7 +607,8 @@ const [carGltf, womanFbx, womanHead, girlTex] = await Promise.all([
   Promise.all([loadTex('assets/f_body.jpg'), loadTex('assets/f_body_n.jpg', false), loadTex('assets/f_head.jpg'), loadTex('assets/f_head_n.jpg', false), loadTex('assets/f_hair.png')])
     .then(([body, bodyN, head, headN, hair]) => ({ body, bodyN, head, headN, hair })),
 ]);
-startEl.textContent = 'Click to begin';
+startEl.textContent = isTouch ? 'Tap to begin' : 'Click to begin';
+if (isTouch && innerHeight > innerWidth) introEl.querySelector('p').insertAdjacentHTML('afterend', '<p>Turn your phone sideways for the best view.</p>');
 
 // ---------- the car: Porsche 911 Carrera 4S (991) ----------
 // model space: +z forward, +x = left (driver) side, y up, ground at y = 0
@@ -814,12 +841,45 @@ addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 const down = k => !!keys[k];
 
 let camYaw = 0, camPitch = 0.2, camDist = 4.5, lastDrag = -10, dragging = false;
-renderer.domElement.addEventListener('pointerdown', e => { dragging = true; renderer.domElement.setPointerCapture(e.pointerId); });
-renderer.domElement.addEventListener('pointerup', () => { dragging = false; });
-renderer.domElement.addEventListener('pointermove', e => {
-  if (!dragging || mode === 'intro') return;
-  camYaw -= e.movementX * 0.005; camPitch = clamp(camPitch + e.movementY * 0.004, -0.05, 1.2); lastDrag = clock.elapsedTime;
+let camPtr = null, lastX = 0, lastY = 0;
+const camSens = isTouch ? 0.008 : 0.005;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (camPtr !== null) return;
+  camPtr = e.pointerId; lastX = e.clientX; lastY = e.clientY; try { renderer.domElement.setPointerCapture(e.pointerId); } catch {}
 });
+const endCam = e => { if (e.pointerId === camPtr) camPtr = null; };
+renderer.domElement.addEventListener('pointerup', endCam);
+renderer.domElement.addEventListener('pointercancel', endCam);
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.pointerId !== camPtr || mode === 'intro') return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY; lastX = e.clientX; lastY = e.clientY;
+  camYaw -= dx * camSens; camPitch = clamp(camPitch + dy * camSens * 0.8, -0.05, 1.2); lastDrag = clock.elapsedTime;
+});
+
+// ---------- touch controls: joystick + buttons ----------
+const stick = { x: 0, y: 0, active: false, id: null };
+const stickEl = document.getElementById('stick'), knob = document.getElementById('knob');
+function moveStick(e) {
+  const r = stickEl.getBoundingClientRect(), R = r.width / 2;
+  let x = (e.clientX - r.left - R) / R, y = (e.clientY - r.top - R) / R;
+  const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+  Object.assign(stick, { x, y, active: true });
+  knob.style.transform = `translate(${x * R * 0.6}px, ${y * R * 0.6}px)`;
+}
+stickEl.addEventListener('pointerdown', e => { stick.id = e.pointerId; try { stickEl.setPointerCapture(e.pointerId); } catch {} moveStick(e); });
+stickEl.addEventListener('pointermove', e => { if (e.pointerId === stick.id) moveStick(e); });
+const endStick = e => { if (e.pointerId !== stick.id) return; Object.assign(stick, { x: 0, y: 0, active: false, id: null }); knob.style.transform = ''; };
+stickEl.addEventListener('pointerup', endStick); stickEl.addEventListener('pointercancel', endStick);
+const btnE = document.getElementById('btnE'), btnAct = document.getElementById('btnAct');
+function holdButton(el, code) {
+  el.addEventListener('pointerdown', e => { keys[code] = true; el.classList.add('on'); try { el.setPointerCapture(e.pointerId); } catch {} });
+  const up = () => { keys[code] = false; el.classList.remove('on'); };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+}
+holdButton(btnAct, 'TouchAct');   // run while walking, handbrake while driving
+holdButton(document.getElementById('btnHorn'), 'KeyH');
+btnE.addEventListener('pointerdown', () => interact());
+addEventListener('contextmenu', e => { if (isTouch) e.preventDefault(); });
 renderer.domElement.addEventListener('wheel', e => { camDist = clamp(camDist * (1 + e.deltaY * 0.001), 2.5, 25); }, { passive: true });
 
 // ---------- tweens / sequences ----------
@@ -940,6 +1000,7 @@ camera.position.copy(introCamPos); camera.lookAt(introLook);
 introEl.addEventListener('click', () => {
   introEl.style.opacity = 0; setTimeout(() => introEl.remove(), 800);
   ['help', 'map', 'place'].forEach(id => document.getElementById(id).style.display = 'block');
+  document.body.classList.add('playing');
   try { audio = initAudio(); } catch (e) { console.warn(e); }
   const d = camera.position.clone().sub(girl.pos.clone().add(new V3(0, 1.45, 0)));
   camYaw = Math.atan2(d.x, d.z); camPitch = 0.12; camDist = 4.5;
@@ -953,10 +1014,11 @@ const GEARS = [0, 15, 27, 39, 51, 63, 90];
 function currentGear(v) { let g = 1; while (g < 6 && v > GEARS[g]) g++; return g; }
 
 function updateGirl(dt) {
-  let mx = 0, mz = 0, run = down('ShiftLeft') || down('ShiftRight');
+  let mx = 0, mz = 0, run = down('ShiftLeft') || down('ShiftRight') || down('TouchAct');
   if (mode === 'walk') {
-    const f = (down('KeyW') || down('ArrowUp') ? 1 : 0) - (down('KeyS') || down('ArrowDown') ? 1 : 0);
-    const r = (down('KeyD') || down('ArrowRight') ? 1 : 0) - (down('KeyA') || down('ArrowLeft') ? 1 : 0);
+    let f = (down('KeyW') || down('ArrowUp') ? 1 : 0) - (down('KeyS') || down('ArrowDown') ? 1 : 0);
+    let r = (down('KeyD') || down('ArrowRight') ? 1 : 0) - (down('KeyA') || down('ArrowLeft') ? 1 : 0);
+    if (stick.active && Math.hypot(stick.x, stick.y) > 0.15) { f = -stick.y; r = stick.x; if (Math.hypot(stick.x, stick.y) > 0.95) run = true; }
     const sy = Math.sin(camYaw), cy = Math.cos(camYaw);
     mx = -sy * f + cy * r; mz = -cy * f - sy * r;
   } else if (mode === 'entering' && autoWalk) {
@@ -1001,9 +1063,9 @@ function updateGirl(dt) {
 
 function updateCar(dt) {
   const driving = mode === 'drive';
-  const up = driving && (down('KeyW') || down('ArrowUp')), dn = driving && (down('KeyS') || down('ArrowDown'));
+  const up = driving && (down('KeyW') || down('ArrowUp') || stick.active && stick.y < -0.25), dn = driving && (down('KeyS') || down('ArrowDown') || stick.active && stick.y > 0.35);
   const left = driving && (down('KeyA') || down('ArrowLeft')), right = driving && (down('KeyD') || down('ArrowRight'));
-  const hb = driving && down('Space');
+  const hb = driving && (down('Space') || down('TouchAct'));
   const off = roadDist(car.pos.x, car.pos.z) > 5.5;
   const vmax = off ? 20 : 78;
   const prev = car.speed;
@@ -1019,7 +1081,7 @@ function updateCar(dt) {
   car.accel += ((v - prev) / Math.max(dt, 1e-4) - car.accel) * Math.min(1, dt * 5);
 
   const maxSteer = Math.min(0.6, Math.atan(2.45 * (hb ? 26 : 15) / (v * v + 1)));
-  const target = ((left ? 1 : 0) - (right ? 1 : 0)) * maxSteer;
+  const target = (stick.active ? clamp(-stick.x * 1.3, -1, 1) : (left ? 1 : 0) - (right ? 1 : 0)) * maxSteer;
   car.steer += (target - car.steer) * Math.min(1, dt * 7);
   car.yawRate = v / 2.45 * Math.tan(car.steer);
   car.heading += car.yawRate * dt;
@@ -1092,6 +1154,12 @@ function updateHUD() {
   let hint = '';
   if (mode === 'walk' && girl.pos.distanceTo(car.pos) < 4.2) hint = '<b>E</b>Get in the car';
   else if (mode === 'drive' && Math.abs(car.speed) < 3) hint = '<b>E</b>Get out · <b>W</b>Drive';
+  if (isTouch) {
+    btnE.style.display = hint ? 'flex' : 'none';
+    btnE.textContent = mode === 'drive' ? 'Get out' : 'Get in';
+    btnAct.textContent = mode === 'drive' ? 'Brake' : 'Run';
+    hint = '';
+  }
   if (hint) hintEl.innerHTML = hint;
   hintEl.style.opacity = hint ? 1 : 0;
   hudEl.style.display = mode === 'drive' ? 'block' : 'none';

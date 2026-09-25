@@ -15,7 +15,7 @@ Play: https://zeredbaron.github.io/yilan-drive/
 | R | put the car back on the road |
 | Mouse drag / wheel | orbit / zoom the camera |
 
-Needs a desktop browser with a keyboard. Built with three.js; everything is in `index.html`.
+On phones and tablets: joystick on the left to walk or drive, buttons on the right to get in or out, run or brake, and honk. Drag anywhere else to look around. Built with three.js; everything is in `index.html`.
 
 ## Credits and licenses
 
